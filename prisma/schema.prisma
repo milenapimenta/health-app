@@ -1,0 +1,211 @@
+// ==========================
+// GENERATOR & DATASOURCE
+// ==========================
+generator client {
+  provider = "prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================
+// ENUMS
+// ==========================
+enum ClinicType {
+  CLINIC
+  PROFESSIONAL
+}
+
+enum UserRole {
+  ADMIN
+  PROFESSIONAL
+  ASSISTANT
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+}
+
+enum RegistrationType {
+  CRM
+  CRN
+  CRO
+  CREF
+  CFP
+}
+
+enum AppointmentType {
+  CONSULTATION
+  SESSION
+  CLASS
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CANCELED
+  DONE
+}
+
+enum RecordType {
+  MEDICAL_NOTE
+  PRESCRIPTION
+  EXAM
+  DIET
+  TRAINING
+  SESSION_NOTE
+}
+
+enum TemplateType {
+  PRESCRIPTION
+  DIET
+  TRAINING
+}
+
+// ==========================
+// MODELS
+// ==========================
+
+model Clinic {
+  id        Int        @id @default(autoincrement())
+  name      String
+  type      ClinicType
+  document  String?
+  status    Status     @default(ACTIVE)
+  createdAt DateTime   @default(now())
+
+  users         User[]
+  professionals Professional[]
+  patients      Patient[]
+  appointments  Appointment[]
+  records       PatientRecord[]
+
+  recordTemplates RecordTemplate[]
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  clinicId  Int
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole
+  status    Status   @default(ACTIVE)
+  createdAt DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@index([clinicId])
+}
+
+model Professional {
+  id                 Int              @id @default(autoincrement())
+  clinicId           Int
+  name               String
+  specialty          String
+  registrationType   RegistrationType
+  registrationNumber String
+  status             Status           @default(ACTIVE)
+  createdAt          DateTime         @default(now())
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  appointments Appointment[]
+  records      RecordEntry[]
+
+  recordTemplates RecordTemplate[]
+
+  @@index([clinicId])
+}
+
+model Patient {
+  id        Int       @id @default(autoincrement())
+  clinicId  Int
+  name      String
+  email     String?
+  phone     String?
+  document  String?
+  birthDate DateTime?
+  status    Status    @default(ACTIVE)
+  createdAt DateTime  @default(now())
+
+  clinic       Clinic         @relation(fields: [clinicId], references: [id])
+  record       PatientRecord?
+  appointments Appointment[]
+
+  @@index([clinicId])
+}
+
+model Appointment {
+  id             Int               @id @default(autoincrement())
+  clinicId       Int
+  professionalId Int
+  patientId      Int
+  scheduledAt    DateTime
+  type           AppointmentType
+  status         AppointmentStatus @default(SCHEDULED)
+  notes          String?
+  createdAt      DateTime          @default(now())
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  professional Professional  @relation(fields: [professionalId], references: [id])
+  patient      Patient       @relation(fields: [patientId], references: [id])
+  records      RecordEntry[]
+
+  @@index([clinicId])
+  @@index([professionalId, scheduledAt])
+  @@index([patientId])
+}
+
+model PatientRecord {
+  id        Int      @id @default(autoincrement())
+  clinicId  Int
+  patientId Int      @unique
+  createdAt DateTime @default(now())
+
+  clinic  Clinic        @relation(fields: [clinicId], references: [id])
+  patient Patient       @relation(fields: [patientId], references: [id])
+  entries RecordEntry[]
+
+  @@index([clinicId])
+}
+
+model RecordEntry {
+  id              Int        @id @default(autoincrement())
+  patientRecordId Int
+  professionalId  Int
+  appointmentId   Int?
+  type            RecordType
+  title           String
+  content         Json
+  createdAt       DateTime   @default(now())
+
+  record       PatientRecord @relation(fields: [patientRecordId], references: [id])
+  professional Professional  @relation(fields: [professionalId], references: [id])
+  appointment  Appointment?  @relation(fields: [appointmentId], references: [id])
+
+  @@index([patientRecordId])
+  @@index([professionalId])
+  @@index([appointmentId])
+}
+
+model RecordTemplate {
+  id             Int          @id @default(autoincrement())
+  clinicId       Int
+  professionalId Int?
+  type           TemplateType
+  name           String
+  description    String?
+  schema         Json
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  professional Professional? @relation(fields: [professionalId], references: [id])
+
+  @@index([clinicId])
+  @@index([professionalId])
+  @@index([type])
+}
